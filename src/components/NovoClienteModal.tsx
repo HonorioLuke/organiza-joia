@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -11,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Cliente } from '../models/types';
 import { ClienteService } from '../services/ClienteService';
 import { theme } from '../theme/theme';
@@ -26,6 +25,8 @@ export const NovoClienteModal: React.FC<NovoClienteModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const keyboardHeight = useKeyboardHeight();
+
   const [nome, setNome] = useState<string>('');
   const [contato, setContato] = useState<string>('');
   const [erro, setErro] = useState<string | null>(null);
@@ -74,12 +75,13 @@ export const NovoClienteModal: React.FC<NovoClienteModalProps> = ({
       animationType="fade"
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        style={styles.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      <View
+        style={[
+          styles.overlay,
+          { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : theme.spacing.lg },
+        ]}
       >
         <View style={styles.modalCard}>
-          {/* Cabeçalho do Modal */}
           <View style={styles.header}>
             <View style={styles.iconCircle}>
               <Ionicons
@@ -94,7 +96,6 @@ export const NovoClienteModal: React.FC<NovoClienteModalProps> = ({
             </Text>
           </View>
 
-          {/* Campos */}
           <View style={styles.formGroup}>
             <Text style={styles.label}>
               Nome completo <Text style={styles.required}>*</Text>
@@ -137,7 +138,6 @@ export const NovoClienteModal: React.FC<NovoClienteModalProps> = ({
             </View>
           ) : null}
 
-          {/* Ações */}
           <View style={styles.actionsRow}>
             <TouchableOpacity
               style={styles.cancelButton}
@@ -165,7 +165,7 @@ export const NovoClienteModal: React.FC<NovoClienteModalProps> = ({
             </TouchableOpacity>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };

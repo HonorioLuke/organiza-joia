@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Cliente } from '../models/types';
 import { ClienteService } from '../services/ClienteService';
 import { theme } from '../theme/theme';
@@ -28,6 +29,7 @@ export const ClienteSelectModal: React.FC<ClienteSelectModalProps> = ({
   onClose,
   onSelect,
 }) => {
+  const keyboardHeight = useKeyboardHeight();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [busca, setBusca] = useState<string>('');
   const [carregando, setCarregando] = useState<boolean>(false);
@@ -59,7 +61,12 @@ export const ClienteSelectModal: React.FC<ClienteSelectModalProps> = ({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <View
+        style={[
+          styles.overlay,
+          { paddingBottom: keyboardHeight > 0 ? keyboardHeight + 16 : theme.spacing.lg },
+        ]}
+      >
         <View style={styles.modalCard}>
           <View style={styles.header}>
             <Text style={styles.title}>Selecionar cliente</Text>
@@ -96,6 +103,7 @@ export const ClienteSelectModal: React.FC<ClienteSelectModalProps> = ({
               data={clientes}
               keyExtractor={(item) => String(item.id)}
               style={styles.list}
+              keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => {
                 const isSelected = item.id === selectedClienteId;

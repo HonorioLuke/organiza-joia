@@ -1,23 +1,24 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { DiamondIcon, GoldDiamondDivider } from '../components/JewelryLogo';
 import { useAuth } from '../contexts/AuthContext';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { theme } from '../theme/theme';
 
 export const LoginScreen: React.FC = () => {
   const { signIn } = useAuth();
+  const keyboardHeight = useKeyboardHeight();
 
   const [usuario, setUsuario] = useState<string>('');
   const [senha, setSenha] = useState<string>('');
@@ -46,128 +47,126 @@ export const LoginScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
+      <ScrollView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom:
+              keyboardHeight > 0 ? keyboardHeight + 24 : theme.spacing.lg,
+          },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Detalhe decorativo superior */}
-          <View style={styles.topAccentCircle} />
+        <View style={styles.topAccentCircle} />
 
-          {/* Logotipo e Título */}
-          <View style={styles.brandContainer}>
-            <DiamondIcon size={64} color={theme.colors.gold} />
-            <Text style={styles.brandTitle}>Joias</Text>
-            <View style={styles.brandUnderline} />
-            <Text style={styles.subtitle}>Acesse sua conta</Text>
+        <View style={styles.brandContainer}>
+          <DiamondIcon size={64} color={theme.colors.gold} />
+          <Text style={styles.brandTitle}>Joias</Text>
+          <View style={styles.brandUnderline} />
+          <Text style={styles.subtitle}>Acesse sua conta</Text>
+        </View>
+
+        <View style={styles.formContainer}>
+          <Text style={styles.label}>Usuário</Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons
+              name="person-outline"
+              size={20}
+              color={theme.colors.textSecondary}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Digite seu usuário"
+              placeholderTextColor={theme.colors.textMuted}
+              value={usuario}
+              onChangeText={(text) => {
+                setUsuario(text);
+                if (erro) setErro(null);
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="next"
+            />
           </View>
 
-          {/* Formulário */}
-          <View style={styles.formContainer}>
-            <Text style={styles.label}>Usuário</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={theme.colors.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Digite seu usuário"
-                placeholderTextColor={theme.colors.textMuted}
-                value={usuario}
-                onChangeText={(text) => {
-                  setUsuario(text);
-                  if (erro) setErro(null);
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="next"
-              />
-            </View>
-
-            <Text style={[styles.label, styles.passwordLabelSpacing]}>
-              Senha
-            </Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={theme.colors.textSecondary}
-                style={styles.inputIcon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Digite sua senha"
-                placeholderTextColor={theme.colors.textMuted}
-                value={senha}
-                onChangeText={(text) => {
-                  setSenha(text);
-                  if (erro) setErro(null);
-                }}
-                secureTextEntry={!mostrarSenha}
-                autoCapitalize="none"
-                autoCorrect={false}
-                returnKeyType="done"
-                onSubmitEditing={handleLogin}
-              />
-              <TouchableOpacity
-                onPress={() => setMostrarSenha((prev) => !prev)}
-                style={styles.eyeButton}
-                accessibilityLabel={
-                  mostrarSenha ? 'Ocultar senha' : 'Visualizar senha'
-                }
-              >
-                <Ionicons
-                  name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
-                  size={20}
-                  color={theme.colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {erro ? (
-              <View style={styles.errorBox}>
-                <Ionicons
-                  name="alert-circle-outline"
-                  size={18}
-                  color={theme.colors.danger}
-                />
-                <Text style={styles.errorText}>{erro}</Text>
-              </View>
-            ) : null}
-
+          <Text style={[styles.label, styles.passwordLabelSpacing]}>
+            Senha
+          </Text>
+          <View style={styles.inputWrapper}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={20}
+              color={theme.colors.textSecondary}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Digite sua senha"
+              placeholderTextColor={theme.colors.textMuted}
+              value={senha}
+              onChangeText={(text) => {
+                setSenha(text);
+                if (erro) setErro(null);
+              }}
+              secureTextEntry={!mostrarSenha}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
             <TouchableOpacity
-              style={[
-                styles.loginButton,
-                carregando && styles.loginButtonDisabled,
-              ]}
-              onPress={handleLogin}
-              disabled={carregando}
-              activeOpacity={0.85}
+              onPress={() => setMostrarSenha((prev) => !prev)}
+              style={styles.eyeButton}
+              accessibilityLabel={
+                mostrarSenha ? 'Ocultar senha' : 'Visualizar senha'
+              }
             >
-              {carregando ? (
-                <ActivityIndicator color={theme.colors.white} />
-              ) : (
-                <Text style={styles.loginButtonText}>Entrar</Text>
-              )}
+              <Ionicons
+                name={mostrarSenha ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={theme.colors.textSecondary}
+              />
             </TouchableOpacity>
           </View>
 
-          {/* Rodapé elegante */}
-          <View style={styles.footerContainer}>
-            <GoldDiamondDivider />
-            <Text style={styles.footerText}>
-              Controle de clientes e compras da sua joalheria em um só lugar.
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          {erro ? (
+            <View style={styles.errorBox}>
+              <Ionicons
+                name="alert-circle-outline"
+                size={18}
+                color={theme.colors.danger}
+              />
+              <Text style={styles.errorText}>{erro}</Text>
+            </View>
+          ) : null}
+
+          <TouchableOpacity
+            style={[
+              styles.loginButton,
+              carregando && styles.loginButtonDisabled,
+            ]}
+            onPress={handleLogin}
+            disabled={carregando}
+            activeOpacity={0.85}
+          >
+            {carregando ? (
+              <ActivityIndicator color={theme.colors.white} />
+            ) : (
+              <Text style={styles.loginButtonText}>Entrar</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.footerContainer}>
+          <GoldDiamondDivider />
+          <Text style={styles.footerText}>
+            Controle de clientes e compras da sua joalheria em um só lugar.
+          </Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -185,7 +184,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
     paddingTop: theme.spacing.xl,
-    paddingBottom: theme.spacing.lg,
   },
   topAccentCircle: {
     position: 'absolute',

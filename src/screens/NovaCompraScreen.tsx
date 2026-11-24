@@ -1,8 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +13,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { ClienteSelectModal } from '../components/ClienteSelectModal';
 import { JewelryIllustration } from '../components/JewelryIllustration';
+import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Cliente, ItemCompraDraft, TipoJoia } from '../models/types';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { ClienteService } from '../services/ClienteService';
@@ -43,6 +42,8 @@ function createEmptyItem(): ItemCompraDraft {
 
 export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
   const initialClienteId = route.params?.clienteId ?? null;
+  const keyboardHeight = useKeyboardHeight();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(
     null
@@ -65,6 +66,9 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleAdicionarJoia = () => {
     setItens((prev) => [...prev, createEmptyItem()]);
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 120);
   };
 
   const handleRemoverJoia = (localId: string) => {
@@ -127,7 +131,6 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Cabeçalho fiel ao protótipo */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -156,279 +159,268 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
+      <ScrollView
+        ref={scrollViewRef}
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        contentContainerStyle={[
+          styles.scrollContent,
+          {
+            paddingBottom:
+              keyboardHeight > 0 ? keyboardHeight + 32 : theme.spacing.xl,
+          },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
+        <Text style={styles.fieldLabel}>Cliente</Text>
+        <TouchableOpacity
+          style={styles.selectCard}
+          activeOpacity={0.75}
+          onPress={() => setModalClienteVisivel(true)}
         >
-          {/* Seleção do Cliente */}
-          <Text style={styles.fieldLabel}>Cliente</Text>
-          <TouchableOpacity
-            style={styles.selectCard}
-            activeOpacity={0.75}
-            onPress={() => setModalClienteVisivel(true)}
+          <Text
+            style={[
+              styles.selectCardText,
+              !clienteSelecionado && styles.placeholderText,
+            ]}
           >
-            <Text
-              style={[
-                styles.selectCardText,
-                !clienteSelecionado && styles.placeholderText,
-              ]}
-            >
-              {clienteSelecionado
-                ? clienteSelecionado.nome
-                : 'Selecione um cliente...'}
-            </Text>
-            <Ionicons
-              name="chevron-forward"
-              size={20}
-              color={theme.colors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          {/* Data da Compra */}
-          <Text style={[styles.fieldLabel, styles.spacingTopMd]}>
-            Data da compra
+            {clienteSelecionado
+              ? clienteSelecionado.nome
+              : 'Selecione um cliente...'}
           </Text>
-          <View style={styles.dateInputCard}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color={theme.colors.primary}
-              style={styles.dateIcon}
-            />
-            <TextInput
-              style={styles.dateInput}
-              value={dataCompra}
-              onChangeText={(text) => setDataCompra(applyDateMask(text))}
-              placeholder="DD/MM/AAAA"
-              placeholderTextColor={theme.colors.textMuted}
-              keyboardType="numeric"
-              maxLength={10}
-            />
-          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color={theme.colors.textSecondary}
+          />
+        </TouchableOpacity>
 
-          {/* Seção: Itens da Compra */}
-          <View style={styles.itemsHeaderRow}>
-            <Text style={styles.sectionTitle}>Itens da compra</Text>
-            <Text style={styles.itemsCountBadge}>
-              {itens.length} {itens.length === 1 ? 'joia' : 'joias'}
-            </Text>
-          </View>
+        <Text style={[styles.fieldLabel, styles.spacingTopMd]}>
+          Data da compra
+        </Text>
+        <View style={styles.dateInputCard}>
+          <Ionicons
+            name="calendar-outline"
+            size={20}
+            color={theme.colors.primary}
+            style={styles.dateIcon}
+          />
+          <TextInput
+            style={styles.dateInput}
+            value={dataCompra}
+            onChangeText={(text) => setDataCompra(applyDateMask(text))}
+            placeholder="DD/MM/AAAA"
+            placeholderTextColor={theme.colors.textMuted}
+            keyboardType="numeric"
+            maxLength={10}
+          />
+        </View>
 
-          {itens.map((item) => {
-            const subtotal = calcularSubtotalItem(item);
-            const dropdownAberto = tipoDropdownAbertoId === item.localId;
+        <View style={styles.itemsHeaderRow}>
+          <Text style={styles.sectionTitle}>Itens da compra</Text>
+          <Text style={styles.itemsCountBadge}>
+            {itens.length} {itens.length === 1 ? 'joia' : 'joias'}
+          </Text>
+        </View>
 
-            return (
-              <View key={item.localId} style={styles.itemCard}>
-                {/* Coluna esquerda: Ilustração da joia */}
-                <View style={styles.itemLeftColumn}>
-                  <JewelryIllustration tipo={item.tipo_joia} size={60} />
-                </View>
+        {itens.map((item) => {
+          const subtotal = calcularSubtotalItem(item);
+          const dropdownAberto = tipoDropdownAbertoId === item.localId;
 
-                {/* Coluna direita: Campos da joia */}
-                <View style={styles.itemRightColumn}>
-                  {/* Linha Tipo de Joia + Botão Excluir Item */}
-                  <View style={styles.itemTopRow}>
-                    <Text style={styles.itemSmallLabel}>Tipo de joia</Text>
-                    <TouchableOpacity
-                      onPress={() => handleRemoverJoia(item.localId)}
-                      style={styles.removeItemBtn}
-                      accessibilityLabel="Remover joia"
-                    >
-                      <Ionicons
-                        name="trash-outline"
-                        size={19}
-                        color={theme.colors.danger}
-                      />
-                    </TouchableOpacity>
-                  </View>
+          return (
+            <View key={item.localId} style={styles.itemCard}>
+              <View style={styles.itemLeftColumn}>
+                <JewelryIllustration tipo={item.tipo_joia} size={60} />
+              </View>
 
-                  {/* Seletor de Tipo */}
+              <View style={styles.itemRightColumn}>
+                <View style={styles.itemTopRow}>
+                  <Text style={styles.itemSmallLabel}>Tipo de joia</Text>
                   <TouchableOpacity
-                    style={styles.dropdownButton}
-                    activeOpacity={0.8}
-                    onPress={() =>
-                      setTipoDropdownAbertoId(
-                        dropdownAberto ? null : item.localId
-                      )
-                    }
+                    onPress={() => handleRemoverJoia(item.localId)}
+                    style={styles.removeItemBtn}
+                    accessibilityLabel="Remover joia"
                   >
-                    <Text style={styles.dropdownButtonText}>
-                      {item.tipo_joia}
-                    </Text>
                     <Ionicons
-                      name={dropdownAberto ? 'chevron-up' : 'chevron-down'}
-                      size={18}
-                      color={theme.colors.textSecondary}
+                      name="trash-outline"
+                      size={19}
+                      color={theme.colors.danger}
                     />
                   </TouchableOpacity>
+                </View>
 
-                  {/* Opções do Seletor */}
-                  {dropdownAberto && (
-                    <View style={styles.dropdownMenu}>
-                      {TIPOS_JOIA.map((tipoOpcao) => {
-                        const ativo = item.tipo_joia === tipoOpcao;
-                        return (
-                          <TouchableOpacity
-                            key={tipoOpcao}
+                <TouchableOpacity
+                  style={styles.dropdownButton}
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    setTipoDropdownAbertoId(
+                      dropdownAberto ? null : item.localId
+                    )
+                  }
+                >
+                  <Text style={styles.dropdownButtonText}>
+                    {item.tipo_joia}
+                  </Text>
+                  <Ionicons
+                    name={dropdownAberto ? 'chevron-up' : 'chevron-down'}
+                    size={18}
+                    color={theme.colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                {dropdownAberto && (
+                  <View style={styles.dropdownMenu}>
+                    {TIPOS_JOIA.map((tipoOpcao) => {
+                      const ativo = item.tipo_joia === tipoOpcao;
+                      return (
+                        <TouchableOpacity
+                          key={tipoOpcao}
+                          style={[
+                            styles.dropdownOption,
+                            ativo && styles.dropdownOptionActive,
+                          ]}
+                          onPress={() => {
+                            handleAtualizarItem(
+                              item.localId,
+                              'tipo_joia',
+                              tipoOpcao
+                            );
+                            setTipoDropdownAbertoId(null);
+                          }}
+                        >
+                          <Text
                             style={[
-                              styles.dropdownOption,
-                              ativo && styles.dropdownOptionActive,
+                              styles.dropdownOptionText,
+                              ativo && styles.dropdownOptionTextActive,
                             ]}
-                            onPress={() => {
-                              handleAtualizarItem(
-                                item.localId,
-                                'tipo_joia',
-                                tipoOpcao
-                              );
-                              setTipoDropdownAbertoId(null);
-                            }}
                           >
-                            <Text
-                              style={[
-                                styles.dropdownOptionText,
-                                ativo && styles.dropdownOptionTextActive,
-                              ]}
-                            >
-                              {tipoOpcao}
-                            </Text>
-                            {ativo && (
-                              <Ionicons
-                                name="checkmark"
-                                size={16}
-                                color={theme.colors.primary}
-                              />
-                            )}
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  )}
+                            {tipoOpcao}
+                          </Text>
+                          {ativo && (
+                            <Ionicons
+                              name="checkmark"
+                              size={16}
+                              color={theme.colors.primary}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
 
-                  {/* Campo condicional quando "Outro" for selecionado (Regra 4.4) */}
-                  {item.tipo_joia === 'Outro' && (
-                    <View style={styles.itemFieldSpacing}>
-                      <Text style={styles.itemSmallLabel}>
-                        Qual tipo de joia? *
-                      </Text>
-                      <TextInput
-                        style={styles.itemTextInput}
-                        placeholder="Ex.: Colar, Pingente, Tornozeleira..."
-                        placeholderTextColor={theme.colors.textMuted}
-                        value={item.tipo_personalizado}
-                        onChangeText={(text) =>
-                          handleAtualizarItem(
-                            item.localId,
-                            'tipo_personalizado',
-                            text
-                          )
-                        }
-                      />
-                    </View>
-                  )}
-
-                  {/* Detalhamento personalizado (disponível para todos os tipos) */}
+                {item.tipo_joia === 'Outro' && (
                   <View style={styles.itemFieldSpacing}>
                     <Text style={styles.itemSmallLabel}>
-                      Detalhamento personalizado
+                      Qual tipo de joia? *
                     </Text>
                     <TextInput
                       style={styles.itemTextInput}
-                      placeholder="Ex.: Dourado, pedra azul, aro 18"
+                      placeholder="Ex.: Colar, Pingente, Tornozeleira..."
                       placeholderTextColor={theme.colors.textMuted}
-                      value={item.detalhamento}
+                      value={item.tipo_personalizado}
                       onChangeText={(text) =>
-                        handleAtualizarItem(item.localId, 'detalhamento', text)
+                        handleAtualizarItem(
+                          item.localId,
+                          'tipo_personalizado',
+                          text
+                        )
                       }
                     />
                   </View>
+                )}
 
-                  {/* Quantidade, Preço unitário e Subtotal */}
-                  <View style={styles.commercialRow}>
-                    <View style={styles.qtdColumn}>
-                      <Text style={styles.itemSmallLabel}>Quantidade</Text>
+                <View style={styles.itemFieldSpacing}>
+                  <Text style={styles.itemSmallLabel}>
+                    Detalhamento personalizado
+                  </Text>
+                  <TextInput
+                    style={styles.itemTextInput}
+                    placeholder="Ex.: Dourado, pedra azul, aro 18"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={item.detalhamento}
+                    onChangeText={(text) =>
+                      handleAtualizarItem(item.localId, 'detalhamento', text)
+                    }
+                  />
+                </View>
+
+                <View style={styles.commercialRow}>
+                  <View style={styles.qtdColumn}>
+                    <Text style={styles.itemSmallLabel}>Quantidade</Text>
+                    <TextInput
+                      style={styles.qtdInput}
+                      keyboardType="number-pad"
+                      value={item.quantidade}
+                      onChangeText={(text) =>
+                        handleAtualizarItem(
+                          item.localId,
+                          'quantidade',
+                          text.replace(/\D/g, '')
+                        )
+                      }
+                      placeholder="1"
+                      placeholderTextColor={theme.colors.textMuted}
+                    />
+                  </View>
+
+                  <View style={styles.priceColumn}>
+                    <Text style={styles.itemSmallLabel}>Preço unitário</Text>
+                    <View style={styles.priceInputWrapper}>
+                      <Text style={styles.currencyPrefix}>R$</Text>
                       <TextInput
-                        style={styles.qtdInput}
-                        keyboardType="number-pad"
-                        value={item.quantidade}
+                        style={styles.priceInput}
+                        keyboardType="decimal-pad"
+                        value={item.valor_unitario}
                         onChangeText={(text) =>
                           handleAtualizarItem(
                             item.localId,
-                            'quantidade',
-                            text.replace(/\D/g, '')
+                            'valor_unitario',
+                            text.replace(/[^0-9.,]/g, '')
                           )
                         }
-                        placeholder="1"
+                        placeholder="0,00"
                         placeholderTextColor={theme.colors.textMuted}
                       />
                     </View>
 
-                    <View style={styles.priceColumn}>
-                      <Text style={styles.itemSmallLabel}>Preço unitário</Text>
-                      <View style={styles.priceInputWrapper}>
-                        <Text style={styles.currencyPrefix}>R$</Text>
-                        <TextInput
-                          style={styles.priceInput}
-                          keyboardType="decimal-pad"
-                          value={item.valor_unitario}
-                          onChangeText={(text) =>
-                            handleAtualizarItem(
-                              item.localId,
-                              'valor_unitario',
-                              text.replace(/[^0-9.,]/g, '')
-                            )
-                          }
-                          placeholder="0,00"
-                          placeholderTextColor={theme.colors.textMuted}
-                        />
-                      </View>
-
-                      <View style={styles.subtotalRow}>
-                        <Text style={styles.subtotalLabel}>Subtotal</Text>
-                        <Text style={styles.subtotalValue}>
-                          {formatCurrencyBRL(subtotal)}
-                        </Text>
-                      </View>
+                    <View style={styles.subtotalRow}>
+                      <Text style={styles.subtotalLabel}>Subtotal</Text>
+                      <Text style={styles.subtotalValue}>
+                        {formatCurrencyBRL(subtotal)}
+                      </Text>
                     </View>
                   </View>
                 </View>
               </View>
-            );
-          })}
+            </View>
+          );
+        })}
 
-          {/* Botão "+ Adicionar outra joia" */}
-          <TouchableOpacity
-            style={styles.addJewelryButton}
-            activeOpacity={0.8}
-            onPress={handleAdicionarJoia}
-          >
-            <Ionicons name="add" size={20} color={theme.colors.textPrimary} />
-            <Text style={styles.addJewelryText}>Adicionar outra joia</Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.addJewelryButton}
+          activeOpacity={0.8}
+          onPress={handleAdicionarJoia}
+        >
+          <Ionicons name="add" size={20} color={theme.colors.textPrimary} />
+          <Text style={styles.addJewelryText}>Adicionar outra joia</Text>
+        </TouchableOpacity>
 
-          {/* Total da compra */}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total da compra</Text>
-            <Text style={styles.totalValue}>
-              {formatCurrencyBRL(totalCompra)}
-            </Text>
-          </View>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>Total da compra</Text>
+          <Text style={styles.totalValue}>
+            {formatCurrencyBRL(totalCompra)}
+          </Text>
+        </View>
 
-          {/* Botão Salvar compra */}
-          <TouchableOpacity
-            style={styles.saveButton}
-            activeOpacity={0.85}
-            onPress={handleSalvarRascunhoEtapa3}
-          >
-            <Text style={styles.saveButtonText}>Salvar compra</Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        <TouchableOpacity
+          style={styles.saveButton}
+          activeOpacity={0.85}
+          onPress={handleSalvarRascunhoEtapa3}
+        >
+          <Text style={styles.saveButtonText}>Salvar compra</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <ClienteSelectModal
         visible={modalClienteVisivel}
@@ -467,7 +459,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: theme.spacing.md,
-    paddingBottom: theme.spacing.xl,
   },
   fieldLabel: {
     ...theme.typography.label,
