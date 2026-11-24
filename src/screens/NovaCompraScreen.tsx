@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ScrollView,
@@ -43,7 +43,7 @@ function createEmptyItem(): ItemCompraDraft {
 export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
   const initialClienteId = route.params?.clienteId ?? null;
   const keyboardHeight = useKeyboardHeight();
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<ComponentRef<typeof ScrollView>>(null);
 
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(
     null
