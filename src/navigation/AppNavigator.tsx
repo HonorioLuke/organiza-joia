@@ -15,12 +15,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { ClientesScreen } from '../screens/ClientesScreen';
 import { HistoricoClienteScreen } from '../screens/HistoricoClienteScreen';
 import { LoginScreen } from '../screens/LoginScreen';
+import { NovaCompraScreen } from '../screens/NovaCompraScreen';
 import { theme } from '../theme/theme';
 
 export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
   HistoricoCliente: { clienteId: number };
+  NovaCompra: { clienteId?: number } | undefined;
 };
 
 export type MainTabParamList = {
@@ -150,6 +152,7 @@ export const AppNavigator: React.FC = () => {
               name="HistoricoCliente"
               component={HistoricoClienteScreen}
             />
+            <Stack.Screen name="NovaCompra" component={NovaCompraScreen} />
           </>
         )}
       </Stack.Navigator>

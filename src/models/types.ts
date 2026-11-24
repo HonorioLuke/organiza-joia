@@ -42,6 +42,17 @@ export interface ItemCompra {
   subtotal: number;
 }
 
+
+export interface ItemCompraDraft {
+  localId: string;
+  tipo_joia: TipoJoia;
+  tipo_personalizado: string;
+  detalhamento: string;
+  quantidade: string;
+  valor_unitario: string;
+}
+
+
 export interface Compra {
   id: number;
   cliente_id: number;

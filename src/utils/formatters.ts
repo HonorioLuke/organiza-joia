@@ -23,12 +23,10 @@ export function formatDateBR(dateValue: string | null | undefined): string {
 
   const trimmed = dateValue.trim();
 
-  // Já está no padrão DD/MM/AAAA
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
     return trimmed;
   }
 
-  // Padrão ISO YYYY-MM-DD (com ou sem horário)
   const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
   if (isoMatch) {
     const [, year, month, day] = isoMatch;
@@ -38,10 +36,32 @@ export function formatDateBR(dateValue: string | null | undefined): string {
   return trimmed;
 }
 
+export function getTodayBR(): string {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+export function applyDateMask(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
 export function formatCurrencyBRL(value: number): string {
   const safeValue = Number.isFinite(value) ? value : 0;
   return safeValue.toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   });
+}
+
+export function parseDecimalInput(raw: string): number {
+  if (!raw || !raw.trim()) return 0;
+  const normalized = raw.replace(/\./g, '').replace(',', '.').trim();
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

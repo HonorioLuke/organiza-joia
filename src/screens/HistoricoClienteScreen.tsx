@@ -51,7 +51,6 @@ export const HistoricoClienteScreen: React.FC<Props> = ({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {/* Cabeçalho */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -76,7 +75,6 @@ export const HistoricoClienteScreen: React.FC<Props> = ({
         </View>
       ) : cliente ? (
         <View style={styles.content}>
-          {/* Cartão Resumo do Cliente */}
           <View style={styles.summaryCard}>
             <View style={styles.clientRow}>
               <View style={styles.avatarCircle}>
@@ -97,17 +95,31 @@ export const HistoricoClienteScreen: React.FC<Props> = ({
             </View>
           </View>
 
-          {/* Aviso de fluxo para Etapas 3 e 5 */}
+          <TouchableOpacity
+            style={styles.newPurchaseButton}
+            activeOpacity={0.85}
+            onPress={() =>
+              navigation.navigate('NovaCompra', { clienteId: cliente.id })
+            }
+          >
+            <Ionicons
+              name="add-circle-outline"
+              size={22}
+              color={theme.colors.white}
+            />
+            <Text style={styles.newPurchaseButtonText}>Nova compra</Text>
+          </TouchableOpacity>
+
           <View style={styles.infoBox}>
             <Ionicons
               name="sparkles-outline"
               size={24}
               color={theme.colors.gold}
             />
-            <Text style={styles.infoTitle}>Consulta de cliente ativa</Text>
+            <Text style={styles.infoTitle}>Histórico de compras</Text>
             <Text style={styles.infoText}>
-              O registro de novas compras e a listagem completa do histórico
-              serão habilitados nas próximas etapas.
+              O salvamento no banco (Etapa 4) e a listagem completa do histórico
+              (Etapa 5) serão ativados na sequência.
             </Text>
           </View>
         </View>
@@ -200,6 +212,21 @@ const styles = StyleSheet.create({
     color: theme.colors.gold,
     fontWeight: '600',
     marginTop: 2,
+  },
+  newPurchaseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+    borderRadius: theme.radii.md,
+    height: 50,
+    gap: theme.spacing.sm,
+    ...theme.shadows.card,
+  },
+  newPurchaseButtonText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontWeight: '700',
   },
   infoBox: {
     backgroundColor: theme.colors.surface,
