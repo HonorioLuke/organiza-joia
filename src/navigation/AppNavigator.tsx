@@ -12,12 +12,15 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { DiamondIcon } from '../components/JewelryLogo';
 import { useAuth } from '../contexts/AuthContext';
+import { ClientesScreen } from '../screens/ClientesScreen';
+import { HistoricoClienteScreen } from '../screens/HistoricoClienteScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { theme } from '../theme/theme';
 
 export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
+  HistoricoCliente: { clienteId: number };
 };
 
 export type MainTabParamList = {
@@ -27,17 +30,6 @@ export type MainTabParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
-
-// Telas base protegidas que serão expandidas nas Etapas 2 e 6
-const ClientesPlaceholderScreen: React.FC = () => (
-  <View style={styles.placeholderContainer}>
-    <DiamondIcon size={44} color={theme.colors.gold} />
-    <Text style={styles.placeholderTitle}>Clientes</Text>
-    <Text style={styles.placeholderSubtitle}>
-      Área autenticada ativa. Pronta para a Etapa 2 (Gestão de Clientes).
-    </Text>
-  </View>
-);
 
 const LixeiraPlaceholderScreen: React.FC = () => (
   <View style={styles.placeholderContainer}>
@@ -118,7 +110,7 @@ const MainTabNavigator: React.FC = () => {
     >
       <Tab.Screen
         name="ClientesTab"
-        component={ClientesPlaceholderScreen}
+        component={ClientesScreen}
         options={{ title: 'Clientes' }}
       />
       <Tab.Screen
@@ -152,7 +144,13 @@ export const AppNavigator: React.FC = () => {
         {!isAuthenticated ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : (
-          <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+          <>
+            <Stack.Screen name="MainTabs" component={MainTabNavigator} />
+            <Stack.Screen
+              name="HistoricoCliente"
+              component={HistoricoClienteScreen}
+            />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
