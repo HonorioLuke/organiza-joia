@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Variáveis de ambiente locais (não enviar senha real ao GitHub)
+.env
