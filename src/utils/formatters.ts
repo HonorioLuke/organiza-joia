@@ -1,3 +1,8 @@
+export function roundCurrency(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 export function getInitials(nome: string): string {
   const parts = nome
     .trim()
@@ -52,16 +57,30 @@ export function applyDateMask(raw: string): string {
 }
 
 export function formatCurrencyBRL(value: number): string {
-  const safeValue = Number.isFinite(value) ? value : 0;
+  const safeValue = roundCurrency(value);
   return safeValue.toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   });
 }
 
+/**
+ * Interpreta entradas numéricas em padrão brasileiro (ex.: "1.250,50" ou "120,50")
+ * e também padrão decimal com ponto (ex.: "120.50").
+ */
 export function parseDecimalInput(raw: string): number {
   if (!raw || !raw.trim()) return 0;
-  const normalized = raw.replace(/\./g, '').replace(',', '.').trim();
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : 0;
+
+  let clean = raw.trim().replace(/\s/g, '');
+
+  if (clean.includes(',') && clean.includes('.')) {
+    // Ex.: 1.250,50 -> remove separador de milhar e troca vírgula por ponto
+    clean = clean.replace(/\./g, '').replace(',', '.');
+  } else if (clean.includes(',')) {
+    // Ex.: 120,50 -> troca vírgula por ponto
+    clean = clean.replace(',', '.');
+  }
+
+  const parsed = Number(clean);
+  return Number.isFinite(parsed) ? roundCurrency(parsed) : 0;
 }

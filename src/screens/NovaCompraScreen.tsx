@@ -1,5 +1,6 @@
 import React, { ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -17,12 +18,14 @@ import { useKeyboardHeight } from '../hooks/useKeyboardHeight';
 import { Cliente, ItemCompraDraft, TipoJoia } from '../models/types';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { ClienteService } from '../services/ClienteService';
+import { CompraService } from '../services/CompraService';
 import { theme } from '../theme/theme';
 import {
   applyDateMask,
   formatCurrencyBRL,
   getTodayBR,
   parseDecimalInput,
+  roundCurrency,
 } from '../utils/formatters';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'NovaCompra'>;
@@ -44,6 +47,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
   const initialClienteId = route.params?.clienteId ?? null;
   const keyboardHeight = useKeyboardHeight();
   const scrollViewRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const submittingRef = useRef<boolean>(false);
 
   const [clienteSelecionado, setClienteSelecionado] = useState<Cliente | null>(
     null
@@ -55,6 +59,8 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
   const [tipoDropdownAbertoId, setTipoDropdownAbertoId] = useState<
     string | null
   >(null);
+  const [erroValidacao, setErroValidacao] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState<boolean>(false);
 
   useEffect(() => {
     if (!initialClienteId) return;
@@ -65,6 +71,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
   }, [initialClienteId]);
 
   const handleAdicionarJoia = () => {
+    if (erroValidacao) setErroValidacao(null);
     setItens((prev) => [...prev, createEmptyItem()]);
     setTimeout(() => {
       scrollViewRef.current?.scrollToEnd({ animated: true });
@@ -80,6 +87,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
       return;
     }
 
+    if (erroValidacao) setErroValidacao(null);
     setItens((prev) => prev.filter((item) => item.localId !== localId));
     if (tipoDropdownAbertoId === localId) {
       setTipoDropdownAbertoId(null);
@@ -91,6 +99,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
     campo: K,
     valor: ItemCompraDraft[K]
   ) => {
+    if (erroValidacao) setErroValidacao(null);
     setItens((prev) =>
       prev.map((item) => {
         if (item.localId !== localId) return item;
@@ -106,7 +115,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
   const calcularSubtotalItem = (item: ItemCompraDraft): number => {
     const qtd = Math.max(0, Math.floor(parseDecimalInput(item.quantidade)));
     const unit = Math.max(0, parseDecimalInput(item.valor_unitario));
-    return Number((qtd * unit).toFixed(2));
+    return roundCurrency(qtd * unit);
   };
 
   const totalCompra = useMemo(() => {
@@ -114,27 +123,64 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
       (acc, item) => acc + calcularSubtotalItem(item),
       0
     );
-    return Number(soma.toFixed(2));
+    return roundCurrency(soma);
   }, [itens]);
 
-  const handleSalvarRascunhoEtapa3 = () => {
-    if (!clienteSelecionado) {
-      Alert.alert('Cliente obrigatório', 'Selecione um cliente antes de continuar.');
-      return;
-    }
+  const handleSalvarCompra = async () => {
+    // Prevenção contra compras duplicadas por toques rápidos consecutivos
+    if (submittingRef.current || salvando) return;
 
-    Alert.alert(
-      'Formulário da Etapa 3 validado',
-      `Cliente: ${clienteSelecionado.nome}\nData: ${dataCompra}\nJoias adicionadas: ${itens.length}\nTotal prévio: ${formatCurrencyBRL(totalCompra)}\n\nNa Etapa 4 aplicaremos as validações completas e salvaremos no banco SQLite.`
-    );
+    submittingRef.current = true;
+    setSalvando(true);
+    setErroValidacao(null);
+
+    try {
+      const compraSalva = await CompraService.registrarCompra({
+        clienteId: clienteSelecionado?.id ?? null,
+        dataCompraBR: dataCompra,
+        itens,
+      });
+
+      Alert.alert(
+        'Compra registrada',
+        `Compra de ${formatCurrencyBRL(
+          compraSalva.valor_total
+        )} salva com sucesso para ${clienteSelecionado?.nome}.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.replace('HistoricoCliente', {
+                clienteId: compraSalva.cliente_id,
+              });
+            },
+          },
+        ],
+        { cancelable: false }
+      );
+    } catch (error) {
+      const mensagem =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível salvar a compra.';
+      setErroValidacao(mensagem);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } finally {
+      submittingRef.current = false;
+      setSalvando(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Cabeçalho */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerIconBtn}
+          disabled={salvando}
           accessibilityLabel="Voltar"
         >
           <Ionicons
@@ -147,8 +193,9 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
         <Text style={styles.headerTitle}>Nova compra</Text>
 
         <TouchableOpacity
-          onPress={handleSalvarRascunhoEtapa3}
+          onPress={handleSalvarCompra}
           style={styles.headerIconBtn}
+          disabled={salvando}
           accessibilityLabel="Salvar compra"
         >
           <Ionicons
@@ -172,11 +219,16 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Seleção do Cliente */}
         <Text style={styles.fieldLabel}>Cliente</Text>
         <TouchableOpacity
           style={styles.selectCard}
           activeOpacity={0.75}
-          onPress={() => setModalClienteVisivel(true)}
+          disabled={salvando}
+          onPress={() => {
+            if (erroValidacao) setErroValidacao(null);
+            setModalClienteVisivel(true);
+          }}
         >
           <Text
             style={[
@@ -195,6 +247,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
           />
         </TouchableOpacity>
 
+        {/* Data da Compra */}
         <Text style={[styles.fieldLabel, styles.spacingTopMd]}>
           Data da compra
         </Text>
@@ -208,14 +261,19 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
           <TextInput
             style={styles.dateInput}
             value={dataCompra}
-            onChangeText={(text) => setDataCompra(applyDateMask(text))}
+            onChangeText={(text) => {
+              if (erroValidacao) setErroValidacao(null);
+              setDataCompra(applyDateMask(text));
+            }}
             placeholder="DD/MM/AAAA"
             placeholderTextColor={theme.colors.textMuted}
             keyboardType="numeric"
             maxLength={10}
+            editable={!salvando}
           />
         </View>
 
+        {/* Seção: Itens da Compra */}
         <View style={styles.itemsHeaderRow}>
           <Text style={styles.sectionTitle}>Itens da compra</Text>
           <Text style={styles.itemsCountBadge}>
@@ -239,6 +297,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
                   <TouchableOpacity
                     onPress={() => handleRemoverJoia(item.localId)}
                     style={styles.removeItemBtn}
+                    disabled={salvando}
                     accessibilityLabel="Remover joia"
                   >
                     <Ionicons
@@ -252,6 +311,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={styles.dropdownButton}
                   activeOpacity={0.8}
+                  disabled={salvando}
                   onPress={() =>
                     setTipoDropdownAbertoId(
                       dropdownAberto ? null : item.localId
@@ -319,6 +379,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
                       placeholder="Ex.: Colar, Pingente, Tornozeleira..."
                       placeholderTextColor={theme.colors.textMuted}
                       value={item.tipo_personalizado}
+                      editable={!salvando}
                       onChangeText={(text) =>
                         handleAtualizarItem(
                           item.localId,
@@ -339,6 +400,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
                     placeholder="Ex.: Dourado, pedra azul, aro 18"
                     placeholderTextColor={theme.colors.textMuted}
                     value={item.detalhamento}
+                    editable={!salvando}
                     onChangeText={(text) =>
                       handleAtualizarItem(item.localId, 'detalhamento', text)
                     }
@@ -352,6 +414,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
                       style={styles.qtdInput}
                       keyboardType="number-pad"
                       value={item.quantidade}
+                      editable={!salvando}
                       onChangeText={(text) =>
                         handleAtualizarItem(
                           item.localId,
@@ -372,6 +435,7 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
                         style={styles.priceInput}
                         keyboardType="decimal-pad"
                         value={item.valor_unitario}
+                        editable={!salvando}
                         onChangeText={(text) =>
                           handleAtualizarItem(
                             item.localId,
@@ -397,15 +461,30 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
           );
         })}
 
+        {/* Botão "+ Adicionar outra joia" */}
         <TouchableOpacity
           style={styles.addJewelryButton}
           activeOpacity={0.8}
+          disabled={salvando}
           onPress={handleAdicionarJoia}
         >
           <Ionicons name="add" size={20} color={theme.colors.textPrimary} />
           <Text style={styles.addJewelryText}>Adicionar outra joia</Text>
         </TouchableOpacity>
 
+        {/* Alerta de validação */}
+        {erroValidacao ? (
+          <View style={styles.errorBox}>
+            <Ionicons
+              name="alert-circle-outline"
+              size={18}
+              color={theme.colors.danger}
+            />
+            <Text style={styles.errorText}>{erroValidacao}</Text>
+          </View>
+        ) : null}
+
+        {/* Total da compra */}
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>Total da compra</Text>
           <Text style={styles.totalValue}>
@@ -413,12 +492,18 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
           </Text>
         </View>
 
+        {/* Botão Salvar compra */}
         <TouchableOpacity
-          style={styles.saveButton}
+          style={[styles.saveButton, salvando && styles.saveButtonDisabled]}
           activeOpacity={0.85}
-          onPress={handleSalvarRascunhoEtapa3}
+          disabled={salvando}
+          onPress={handleSalvarCompra}
         >
-          <Text style={styles.saveButtonText}>Salvar compra</Text>
+          {salvando ? (
+            <ActivityIndicator color={theme.colors.white} />
+          ) : (
+            <Text style={styles.saveButtonText}>Salvar compra</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
 
@@ -426,7 +511,10 @@ export const NovaCompraScreen: React.FC<Props> = ({ route, navigation }) => {
         visible={modalClienteVisivel}
         selectedClienteId={clienteSelecionado?.id ?? null}
         onClose={() => setModalClienteVisivel(false)}
-        onSelect={(cliente) => setClienteSelecionado(cliente)}
+        onSelect={(cliente) => {
+          if (erroValidacao) setErroValidacao(null);
+          setClienteSelecionado(cliente);
+        }}
       />
     </SafeAreaView>
   );
@@ -689,6 +777,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: theme.colors.textPrimary,
   },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.dangerSoft,
+    borderRadius: theme.radii.sm,
+    padding: theme.spacing.sm + 2,
+    marginTop: theme.spacing.md,
+    gap: theme.spacing.sm,
+  },
+  errorText: {
+    ...theme.typography.caption,
+    color: theme.colors.danger,
+    fontWeight: '600',
+    flex: 1,
+  },
   totalRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -714,6 +817,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...theme.shadows.card,
+  },
+  saveButtonDisabled: {
+    opacity: 0.72,
   },
   saveButtonText: {
     color: theme.colors.white,
