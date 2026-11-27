@@ -42,7 +42,6 @@ export interface ItemCompra {
   subtotal: number;
 }
 
-
 export interface ItemCompraDraft {
   localId: string;
   tipo_joia: TipoJoia;
@@ -51,7 +50,6 @@ export interface ItemCompraDraft {
   quantidade: string;
   valor_unitario: string;
 }
-
 
 export interface Compra {
   id: number;
@@ -64,4 +62,8 @@ export interface Compra {
   expires_at: string | null;
   quantidade_itens?: number;
   itens?: ItemCompra[];
+}
+
+export interface CompraLixeira extends Compra {
+  dias_restantes: number;
 }

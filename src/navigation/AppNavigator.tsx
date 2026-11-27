@@ -9,12 +9,14 @@ import {
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { DiamondIcon } from '../components/JewelryLogo';
 import { useAuth } from '../contexts/AuthContext';
 import { ClientesScreen } from '../screens/ClientesScreen';
 import { DetalhesCompraScreen } from '../screens/DetalhesCompraScreen';
 import { HistoricoClienteScreen } from '../screens/HistoricoClienteScreen';
+import { LixeiraScreen } from '../screens/LixeiraScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { NovaCompraScreen } from '../screens/NovaCompraScreen';
 import { theme } from '../theme/theme';
@@ -35,18 +37,10 @@ export type MainTabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const LixeiraPlaceholderScreen: React.FC = () => (
-  <View style={styles.placeholderContainer}>
-    <Ionicons name="trash-outline" size={40} color={theme.colors.gold} />
-    <Text style={styles.placeholderTitle}>Lixeira</Text>
-    <Text style={styles.placeholderSubtitle}>
-      Retenção de 10 dias será implementada na Etapa 6.
-    </Text>
-  </View>
-);
-
 const MainTabNavigator: React.FC = () => {
   const { signOut } = useAuth();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, 10);
 
   return (
     <Tab.Navigator
@@ -82,8 +76,8 @@ const MainTabNavigator: React.FC = () => {
         tabBarStyle: {
           backgroundColor: theme.colors.surface,
           borderTopColor: theme.colors.border,
-          height: 62,
-          paddingBottom: 8,
+          height: 58 + bottomInset,
+          paddingBottom: bottomInset,
           paddingTop: 6,
         },
         tabBarActiveTintColor: theme.colors.primary,
@@ -119,7 +113,7 @@ const MainTabNavigator: React.FC = () => {
       />
       <Tab.Screen
         name="LixeiraTab"
-        component={LixeiraPlaceholderScreen}
+        component={LixeiraScreen}
         options={{ title: 'Lixeira' }}
       />
     </Tab.Navigator>
@@ -175,24 +169,6 @@ const styles = StyleSheet.create({
   },
   spinner: {
     marginTop: theme.spacing.md,
-  },
-  placeholderContainer: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: theme.spacing.lg,
-  },
-  placeholderTitle: {
-    ...theme.typography.screenTitle,
-    color: theme.colors.primary,
-    marginTop: theme.spacing.md,
-  },
-  placeholderSubtitle: {
-    ...theme.typography.body,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    marginTop: theme.spacing.xs,
   },
   logoutButton: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import { Compra, ItemCompra } from '../../models/types';
+import { Compra, CompraLixeira, ItemCompra } from '../../models/types';
 import { roundCurrency } from '../../utils/formatters';
 import { getDatabase } from '../connection';
 
@@ -12,6 +12,10 @@ export interface CreateCompraRecord {
 export interface ClienteComprasResumo {
   totalAcumulado: number;
   quantidadeCompras: number;
+}
+
+interface TrashRow extends Compra {
+  dias_restantes_raw: number;
 }
 
 export class CompraRepository {
@@ -159,5 +163,77 @@ export class CompraRepository {
       quantidade_itens: itens.length,
       itens,
     };
+  }
+
+  /**
+   * Exclusão lógica: envia a compra para a lixeira com retenção de 10 dias.
+   */
+  static async softDelete(compraId: number): Promise<boolean> {
+    const db = await getDatabase();
+
+    const result = await db.runAsync(
+      `UPDATE compras
+       SET deleted_at = datetime('now', 'localtime'),
+           expires_at = datetime('now', 'localtime', '+10 days')
+       WHERE id = ?
+         AND deleted_at IS NULL`,
+      [compraId]
+    );
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Lista todas as compras na lixeira cujo prazo de 10 dias ainda não expirou.
+   */
+  static async findInTrash(): Promise<CompraLixeira[]> {
+    const db = await getDatabase();
+
+    const rows = await db.getAllAsync<TrashRow>(
+      `SELECT
+        c.id,
+        c.cliente_id,
+        cl.nome AS cliente_nome,
+        c.data_compra,
+        c.valor_total,
+        c.created_at,
+        c.deleted_at,
+        c.expires_at,
+        (
+          SELECT COUNT(*)
+          FROM itens_compra ic
+          WHERE ic.compra_id = c.id
+        ) AS quantidade_itens,
+        (julianday(c.expires_at) - julianday('now', 'localtime')) AS dias_restantes_raw
+      FROM compras c
+      INNER JOIN clientes cl ON cl.id = c.cliente_id
+      WHERE c.deleted_at IS NOT NULL
+        AND datetime(c.expires_at) > datetime('now', 'localtime')
+      ORDER BY c.deleted_at DESC, c.id DESC`
+    );
+
+    return rows.map((row) => ({
+      ...row,
+      dias_restantes: Math.max(1, Math.ceil(row.dias_restantes_raw)),
+    }));
+  }
+
+  /**
+   * Restaura uma compra da lixeira caso ainda esteja dentro dos 10 dias.
+   */
+  static async restoreFromTrash(compraId: number): Promise<boolean> {
+    const db = await getDatabase();
+
+    const result = await db.runAsync(
+      `UPDATE compras
+       SET deleted_at = NULL,
+           expires_at = NULL
+       WHERE id = ?
+         AND deleted_at IS NOT NULL
+         AND datetime(expires_at) > datetime('now', 'localtime')`,
+      [compraId]
+    );
+
+    return result.changes > 0;
   }
 }

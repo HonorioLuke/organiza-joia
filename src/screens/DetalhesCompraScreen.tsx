@@ -12,10 +12,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { ConfirmTrashModal } from '../components/ConfirmTrashModal';
 import { JewelryIllustration } from '../components/JewelryIllustration';
 import { Compra, ItemCompra } from '../models/types';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { CompraService } from '../services/CompraService';
+import { LixeiraService } from '../services/LixeiraService';
 import { theme } from '../theme/theme';
 import { formatCurrencyBRL, formatDateBR } from '../utils/formatters';
 
@@ -30,6 +32,9 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
   const [compra, setCompra] = useState<Compra | null>(null);
   const [carregando, setCarregando] = useState<boolean>(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [modalExcluirVisivel, setModalExcluirVisivel] =
+    useState<boolean>(false);
+  const [excluindo, setExcluindo] = useState<boolean>(false);
 
   const carregarDetalhes = useCallback(async () => {
     try {
@@ -53,11 +58,35 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
     }, [carregarDetalhes])
   );
 
-  const handleExcluirEtapa5 = () => {
-    Alert.alert(
-      'Lixeira de 10 dias (Etapa 6)',
-      'A exclusão lógica com modal de confirmação e retenção de 10 dias na lixeira será ativada na próxima etapa.'
-    );
+  const handleConfirmarExclusao = async () => {
+    if (!compra || excluindo) return;
+
+    setExcluindo(true);
+    try {
+      await LixeiraService.enviarParaLixeira(compra.id);
+      setModalExcluirVisivel(false);
+
+      Alert.alert(
+        'Compra enviada para a lixeira',
+        'A compra ficará disponível na lixeira por 10 dias caso precise restaurá-la.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ],
+        { cancelable: false }
+      );
+    } catch (error) {
+      const msg =
+        error instanceof Error
+          ? error.message
+          : 'Não foi possível excluir a compra.';
+      setModalExcluirVisivel(false);
+      Alert.alert('Erro', msg);
+    } finally {
+      setExcluindo(false);
+    }
   };
 
   const getTituloJoia = (item: ItemCompra): string => {
@@ -69,6 +98,7 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Cabeçalho fiel ao protótipo */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -85,8 +115,9 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
         <Text style={styles.headerTitle}>Detalhes da compra</Text>
 
         <TouchableOpacity
-          onPress={handleExcluirEtapa5}
+          onPress={() => setModalExcluirVisivel(true)}
           style={styles.headerIconBtn}
+          disabled={!compra}
           accessibilityLabel="Excluir compra"
         >
           <Ionicons
@@ -112,6 +143,7 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
         >
+          {/* Informações gerais */}
           <View style={styles.generalCard}>
             <Text style={styles.metaLabel}>Cliente</Text>
             <Text style={styles.clientName}>
@@ -126,6 +158,7 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
             </Text>
           </View>
 
+          {/* Lista completa de joias */}
           <Text style={styles.sectionTitle}>Itens da compra</Text>
 
           {(compra.itens ?? []).map((item, idx) => (
@@ -154,6 +187,7 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
             </View>
           ))}
 
+          {/* Total da compra */}
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total da compra</Text>
             <Text style={styles.totalValue}>
@@ -161,10 +195,11 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
             </Text>
           </View>
 
+          {/* Botão Excluir compra */}
           <TouchableOpacity
             style={styles.deleteButton}
             activeOpacity={0.8}
-            onPress={handleExcluirEtapa5}
+            onPress={() => setModalExcluirVisivel(true)}
           >
             <Ionicons
               name="trash-outline"
@@ -175,6 +210,14 @@ export const DetalhesCompraScreen: React.FC<Props> = ({
           </TouchableOpacity>
         </ScrollView>
       )}
+
+      {/* Janela de confirmação de envio para lixeira (Tela 05 -> Modal) */}
+      <ConfirmTrashModal
+        visible={modalExcluirVisivel}
+        loading={excluindo}
+        onCancel={() => setModalExcluirVisivel(false)}
+        onConfirm={handleConfirmarExclusao}
+      />
     </SafeAreaView>
   );
 };
