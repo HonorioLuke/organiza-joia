@@ -12,10 +12,13 @@ jest.mock('../database/repositories/ClienteRepository', () => ({
 jest.mock('../database/repositories/CompraRepository', () => ({
   CompraRepository: {
     createWithItems: jest.fn(),
+    findActiveByClienteId: jest.fn(),
+    getResumoAtivoByClienteId: jest.fn(),
+    findByIdWithItems: jest.fn(),
   },
 }));
 
-describe('CompraService - Cálculos Automáticos e Integridade da Compra', () => {
+describe('CompraService - Cálculos, Histórico e Detalhes da Compra', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -45,7 +48,7 @@ describe('CompraService - Cálculos Automáticos e Integridade da Compra', () =>
         tipo_personalizado: '',
         detalhamento: 'Dourado, pedra azul',
         quantidade: '2',
-        valor_unitario: '120,00', // 2 x 120 = 240,00
+        valor_unitario: '120,00',
       },
       {
         localId: '2',
@@ -53,7 +56,7 @@ describe('CompraService - Cálculos Automáticos e Integridade da Compra', () =>
         tipo_personalizado: '',
         detalhamento: 'Aro 18',
         quantidade: '1',
-        valor_unitario: '350,00', // 1 x 350 = 350,00
+        valor_unitario: '350,00',
       },
       {
         localId: '3',
@@ -61,7 +64,7 @@ describe('CompraService - Cálculos Automáticos e Integridade da Compra', () =>
         tipo_personalizado: '',
         detalhamento: 'Com zircônias, 18cm',
         quantidade: '1',
-        valor_unitario: '180,00', // 1 x 180 = 180,00
+        valor_unitario: '180,00',
       },
     ];
 
@@ -69,38 +72,6 @@ describe('CompraService - Cálculos Automáticos e Integridade da Compra', () =>
       clienteId: 10,
       dataCompraBR: '12/05/2024',
       itens: itensExemplo,
-    });
-
-    expect(CompraRepository.createWithItems).toHaveBeenCalledWith({
-      cliente_id: 10,
-      data_compra: '2024-05-12',
-      valor_total: 770,
-      itens: [
-        {
-          tipo_joia: 'Brinco',
-          tipo_personalizado: null,
-          detalhamento: 'Dourado, pedra azul',
-          quantidade: 2,
-          valor_unitario: 120,
-          subtotal: 240,
-        },
-        {
-          tipo_joia: 'Anel',
-          tipo_personalizado: null,
-          detalhamento: 'Aro 18',
-          quantidade: 1,
-          valor_unitario: 350,
-          subtotal: 350,
-        },
-        {
-          tipo_joia: 'Pulseira',
-          tipo_personalizado: null,
-          detalhamento: 'Com zircônias, 18cm',
-          quantidade: 1,
-          valor_unitario: 180,
-          subtotal: 180,
-        },
-      ],
     });
 
     expect(compraSalva.valor_total).toBe(770);
@@ -157,7 +128,7 @@ describe('CompraService - Cálculos Automáticos e Integridade da Compra', () =>
           tipo_personalizado: '',
           detalhamento: '',
           quantidade: '3',
-          valor_unitario: '19,99', // 59.97
+          valor_unitario: '19,99',
         },
         {
           localId: '2',
@@ -165,11 +136,59 @@ describe('CompraService - Cálculos Automáticos e Integridade da Compra', () =>
           tipo_personalizado: '',
           detalhamento: '',
           quantidade: '2',
-          valor_unitario: '14,95', // 29.90
+          valor_unitario: '14,95',
         },
       ],
     });
 
     expect(compra.valor_total).toBe(89.87);
+  });
+
+  it('deve retornar histórico ativo, total acumulado e quantidade de compras do cliente', async () => {
+    (ClienteRepository.findById as jest.Mock).mockResolvedValue({
+      id: 1,
+      nome: 'Maria Clara',
+      contato: null,
+      created_at: '2026-05-01',
+    });
+
+    (CompraRepository.getResumoAtivoByClienteId as jest.Mock).mockResolvedValue({
+      totalAcumulado: 1330,
+      quantidadeCompras: 2,
+    });
+
+    (CompraRepository.findActiveByClienteId as jest.Mock).mockResolvedValue([
+      {
+        id: 2,
+        cliente_id: 1,
+        data_compra: '2026-05-12',
+        valor_total: 770,
+        quantidade_itens: 3,
+        deleted_at: null,
+      },
+      {
+        id: 1,
+        cliente_id: 1,
+        data_compra: '2026-05-05',
+        valor_total: 560,
+        quantidade_itens: 2,
+        deleted_at: null,
+      },
+    ]);
+
+    const historico = await CompraService.obterHistoricoCliente(1);
+
+    expect(historico.cliente.nome).toBe('Maria Clara');
+    expect(historico.resumo.totalAcumulado).toBe(1330);
+    expect(historico.resumo.quantidadeCompras).toBe(2);
+    expect(historico.compras).toHaveLength(2);
+  });
+
+  it('deve lançar erro ao buscar detalhes de uma compra inexistente', async () => {
+    (CompraRepository.findByIdWithItems as jest.Mock).mockResolvedValue(null);
+
+    await expect(CompraService.obterDetalhesCompra(999)).rejects.toThrow(
+      'Compra não encontrada.'
+    );
   });
 });

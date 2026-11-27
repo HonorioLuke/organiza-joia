@@ -1,8 +1,17 @@
 import { ClienteRepository } from '../database/repositories/ClienteRepository';
-import { CompraRepository } from '../database/repositories/CompraRepository';
-import { Compra, ItemCompra, ItemCompraDraft } from '../models/types';
+import {
+  ClienteComprasResumo,
+  CompraRepository,
+} from '../database/repositories/CompraRepository';
+import { Cliente, Compra, ItemCompra, ItemCompraDraft } from '../models/types';
 import { roundCurrency } from '../utils/formatters';
 import { validateCompraDraft } from '../utils/validators';
+
+export interface HistoricoClienteData {
+  cliente: Cliente;
+  resumo: ClienteComprasResumo;
+  compras: Compra[];
+}
 
 export class CompraService {
   /**
@@ -21,7 +30,6 @@ export class CompraService {
       throw new Error('O cliente selecionado não foi encontrado no sistema.');
     }
 
-    // Recálculo obrigatório na camada de serviço (não confia nos valores da UI)
     const itensCalculados: Omit<ItemCompra, 'id' | 'compra_id'>[] =
       itensValidados.map((item) => {
         const subtotal = roundCurrency(item.quantidade * item.valor_unitario);
@@ -45,5 +53,40 @@ export class CompraService {
       valor_total: valorTotal,
       itens: itensCalculados,
     });
+  }
+
+  /**
+   * Carrega os dados do cliente, o total acumulado ativo, a quantidade de compras
+   * ativas e o histórico ordenado da mais recente para a mais antiga.
+   */
+  static async obterHistoricoCliente(
+    clienteId: number
+  ): Promise<HistoricoClienteData> {
+    const cliente = await ClienteRepository.findById(clienteId);
+    if (!cliente) {
+      throw new Error('Cliente não encontrado.');
+    }
+
+    const [resumo, compras] = await Promise.all([
+      CompraRepository.getResumoAtivoByClienteId(clienteId),
+      CompraRepository.findActiveByClienteId(clienteId),
+    ]);
+
+    return {
+      cliente,
+      resumo,
+      compras,
+    };
+  }
+
+  /**
+   * Carrega todos os detalhes e itens de uma compra específica.
+   */
+  static async obterDetalhesCompra(compraId: number): Promise<Compra> {
+    const compra = await CompraRepository.findByIdWithItems(compraId);
+    if (!compra) {
+      throw new Error('Compra não encontrada.');
+    }
+    return compra;
   }
 }

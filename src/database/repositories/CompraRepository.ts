@@ -1,4 +1,5 @@
 import { Compra, ItemCompra } from '../../models/types';
+import { roundCurrency } from '../../utils/formatters';
 import { getDatabase } from '../connection';
 
 export interface CreateCompraRecord {
@@ -8,10 +9,14 @@ export interface CreateCompraRecord {
   itens: Omit<ItemCompra, 'id' | 'compra_id'>[];
 }
 
+export interface ClienteComprasResumo {
+  totalAcumulado: number;
+  quantidadeCompras: number;
+}
+
 export class CompraRepository {
   /**
    * Persiste a compra e todos os seus itens dentro de uma transação atômica.
-   * Caso ocorra qualquer erro em algum item, toda a gravação é revertida.
    */
   static async createWithItems(data: CreateCompraRecord): Promise<Compra> {
     const db = await getDatabase();
@@ -54,7 +59,79 @@ export class CompraRepository {
       }
     });
 
-    const createdCompra = await db.getFirstAsync<Compra>(
+    const created = await this.findByIdWithItems(insertedCompraId);
+    if (!created) {
+      throw new Error('Compra registrada, mas não foi possível carregá-la.');
+    }
+
+    return created;
+  }
+
+  /**
+   * Lista todas as compras ATIVAS (fora da lixeira) de um cliente,
+   * ordenadas da mais recente para a mais antiga.
+   */
+  static async findActiveByClienteId(clienteId: number): Promise<Compra[]> {
+    const db = await getDatabase();
+
+    return db.getAllAsync<Compra>(
+      `SELECT
+        c.id,
+        c.cliente_id,
+        cl.nome AS cliente_nome,
+        c.data_compra,
+        c.valor_total,
+        c.created_at,
+        c.deleted_at,
+        c.expires_at,
+        (
+          SELECT COUNT(*)
+          FROM itens_compra ic
+          WHERE ic.compra_id = c.id
+        ) AS quantidade_itens
+      FROM compras c
+      INNER JOIN clientes cl ON cl.id = c.cliente_id
+      WHERE c.cliente_id = ?
+        AND c.deleted_at IS NULL
+      ORDER BY c.data_compra DESC, c.id DESC`,
+      [clienteId]
+    );
+  }
+
+  /**
+   * Calcula o total acumulado e a quantidade de compras ATIVAS do cliente.
+   */
+  static async getResumoAtivoByClienteId(
+    clienteId: number
+  ): Promise<ClienteComprasResumo> {
+    const db = await getDatabase();
+
+    const row = await db.getFirstAsync<{
+      total_acumulado: number | null;
+      quantidade_compras: number | null;
+    }>(
+      `SELECT
+        COALESCE(SUM(valor_total), 0) AS total_acumulado,
+        COUNT(*) AS quantidade_compras
+      FROM compras
+      WHERE cliente_id = ?
+        AND deleted_at IS NULL`,
+      [clienteId]
+    );
+
+    return {
+      totalAcumulado: roundCurrency(row?.total_acumulado ?? 0),
+      quantidadeCompras: Number(row?.quantidade_compras ?? 0),
+    };
+  }
+
+  /**
+   * Busca os dados completos de uma compra e todos os seus itens vinculados.
+   */
+  static async findByIdWithItems(compraId: number): Promise<Compra | null> {
+    const db = await getDatabase();
+
+    const compra = await db.getFirstAsync<Compra>(
       `SELECT
         c.*,
         cl.nome AS cliente_nome
@@ -62,22 +139,25 @@ export class CompraRepository {
       INNER JOIN clientes cl ON cl.id = c.cliente_id
       WHERE c.id = ?
       LIMIT 1`,
-      [insertedCompraId]
+      [compraId]
     );
 
-    if (!createdCompra) {
-      throw new Error('Compra registrada, mas não foi possível carregá-la.');
+    if (!compra) {
+      return null;
     }
 
-    const savedItems = await db.getAllAsync<ItemCompra>(
-      `SELECT * FROM itens_compra WHERE compra_id = ? ORDER BY id ASC`,
-      [insertedCompraId]
+    const itens = await db.getAllAsync<ItemCompra>(
+      `SELECT *
+       FROM itens_compra
+       WHERE compra_id = ?
+       ORDER BY id ASC`,
+      [compraId]
     );
 
     return {
-      ...createdCompra,
-      quantidade_itens: savedItems.length,
-      itens: savedItems,
+      ...compra,
+      quantidade_itens: itens.length,
+      itens,
     };
   }
 }

@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { DiamondIcon } from '../components/JewelryLogo';
 import { useAuth } from '../contexts/AuthContext';
 import { ClientesScreen } from '../screens/ClientesScreen';
+import { DetalhesCompraScreen } from '../screens/DetalhesCompraScreen';
 import { HistoricoClienteScreen } from '../screens/HistoricoClienteScreen';
 import { LoginScreen } from '../screens/LoginScreen';
 import { NovaCompraScreen } from '../screens/NovaCompraScreen';
@@ -23,6 +24,7 @@ export type RootStackParamList = {
   MainTabs: undefined;
   HistoricoCliente: { clienteId: number };
   NovaCompra: { clienteId?: number } | undefined;
+  DetalhesCompra: { compraId: number };
 };
 
 export type MainTabParamList = {
@@ -153,6 +155,10 @@ export const AppNavigator: React.FC = () => {
               component={HistoricoClienteScreen}
             />
             <Stack.Screen name="NovaCompra" component={NovaCompraScreen} />
+            <Stack.Screen
+              name="DetalhesCompra"
+              component={DetalhesCompraScreen}
+            />
           </>
         )}
       </Stack.Navigator>
